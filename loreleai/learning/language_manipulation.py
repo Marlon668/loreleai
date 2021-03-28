@@ -61,13 +61,26 @@ def _plain_extend_clause(
         predicate: a predicate to add to the clause
     """
     if isinstance(clause, Body) and len(clause) == 0:
-        head_variables = [chr(x) for x in range(ord("A"), ord("Z"))][: predicate.get_arity()]
-        possible_heads = [
-            Body(predicate(*list(x)))
-            for x in combinations_with_replacement(head_variables, predicate.get_arity())
-        ]
+        if predicate.arity < 3:
+            head_variables = [chr(x) for x in range(ord("A"), ord("Z"))][: predicate.get_arity()]
+            possible_heads = [
+                Body(predicate(*list(x)))
+                for x in combinations_with_replacement(head_variables, predicate.get_arity())
+            ]
 
-        return possible_heads
+            if predicate.get_arity() == 2:
+                possible_heads.append(Body(predicate(head_variables[1], head_variables[0])))
+            return possible_heads
+        else:
+            head_variables = [chr(x) for x in range(ord("A"), ord("Z"))][: predicate.get_arity()]
+            possible_heads = []
+            possible_heads.append(Body(predicate(head_variables[0], head_variables[1], head_variables[2])))
+            possible_heads.append(Body(predicate(head_variables[0], head_variables[2], head_variables[1])))
+            possible_heads.append(Body(predicate(head_variables[1], head_variables[0], head_variables[2])))
+            possible_heads.append(Body(predicate(head_variables[1], head_variables[2], head_variables[0])))
+            possible_heads.append(Body(predicate(head_variables[2], head_variables[1], head_variables[0])))
+            possible_heads.append(Body(predicate(head_variables[2], head_variables[0], head_variables[1])))
+            return possible_heads
 
     clause_variables: typing.Sequence[Variable] = clause.get_variables()
     used_variables = {x for x in clause_variables}

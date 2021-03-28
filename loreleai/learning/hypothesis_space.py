@@ -80,10 +80,20 @@ class HypothesisSpace(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def insert_node(self, node: typing.Union[Body]) -> bool:
+        raise NotImplementedError()
+
+    @abstractmethod
     def get_current_candidate(self) -> typing.Union[Clause, Procedure]:
         """
         Get the next candidate
         """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def expandwithprimitive(
+            self, node: typing.Union[Clause, Procedure], primitive
+    ) -> typing.Sequence[typing.Union[Clause, Procedure]]:
         raise NotImplementedError()
 
     @abstractmethod
@@ -238,7 +248,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
                 else False
             )
 
-    def _insert_node(self, node: typing.Union[Body]) -> bool:
+    def insert_node(self, node: typing.Union[Body]) -> bool:
         """
         Inserts a clause/procedure into the hypothesis space
 
@@ -395,7 +405,81 @@ class TopDownHypothesisSpace(HypothesisSpace):
         # if self._insert_node returns False, forget the expansion
         expansions_to_consider = []
         for exp_ind in range(len(expansions)):
-            r = self._insert_node(expansions[exp_ind])
+            r = self.insert_node(expansions[exp_ind])
+            if r:
+                expansions_to_consider.append(expansions[exp_ind])
+            # else:
+            #     print("Rejected: {}".format(expansions[exp_ind]))
+
+        expansions = expansions_to_consider
+
+        # add edges
+        for ind in range(len(expansions)):
+            self._insert_edge(node, expansions[ind])
+
+        return expansions
+
+    def expand(
+            self, node: typing.Union[Clause, Procedure]
+    ) -> typing.Sequence[typing.Union[Clause, Procedure]]:
+        """
+        Expands the provided node with provided primitives (extensions become its children in a graph)
+        returns the expanded constructs
+        if already expanded, returns an empty list
+        """
+        body = node.get_body()
+
+        if (
+                "partner" in self._hypothesis_space.nodes[body]
+                or self._hypothesis_space.nodes[body].get("blocked", False)
+        ):
+            # do not expand recursions or blocked nodes
+            return []
+
+        # check if already expanded
+        expansions = list(self._hypothesis_space.successors(body))
+
+        if len(expansions) == 0:
+            expansions = self._expand_body(body)
+        else:
+            return []
+
+        return reduce(
+            lambda x, y: x + y,
+            [self.retrieve_clauses_from_body(x) if "partner" not in self._hypothesis_space.nodes[
+                x] else self._get_recursions(x) for x in expansions],
+            [],
+        )
+
+    def _expand_bodywithprimitive(self, node: Body,primitive) -> typing.Sequence[Body]:
+        """
+                Expands the provided node with provided primitives (extensions become its children in a graph)
+
+                returns the expanded constructs
+        """
+        expansions = OrderedSet()
+
+        # Add the result of applying a primitive
+        exp = primitive(node)
+        expansions = expansions.union(exp)
+
+        # if recursions should be enumerated when FillerPredicate is used to construct the heads
+        if self._use_recursions:
+            if isinstance(self._head_constructor, FillerPredicate):
+                recursive_cases = self._head_constructor.add_to_body(node)
+            elif isinstance(self._head_constructor, Predicate):
+                recursive_cases = self._recursive_expansion(node)
+            else:
+                raise Exception(f"Unknown head constructor ({type(self._head_constructor)})")
+
+            for r_ind in range(len(recursive_cases)):
+                expansions = expansions.union([node + recursive_cases[r_ind]])
+
+        # add expansions to the hypothesis space
+        # if self._insert_node returns False, forget the expansion
+        expansions_to_consider = []
+        for exp_ind in range(len(expansions)):
+            r = self.insert_node(expansions[exp_ind])
             if r:
                 expansions_to_consider.append(expansions[exp_ind])
             # else:
@@ -424,8 +508,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
         ]
         return [Clause(x, body) for x in heads]
 
-    def expand(
-        self, node: typing.Union[Clause, Procedure]
+    def expandwithprimitive(
+        self, node: typing.Union[Clause, Procedure], primitive
     ) -> typing.Sequence[typing.Union[Clause, Procedure]]:
         """
         Expands the provided node with provided primitives (extensions become its children in a graph)
@@ -446,15 +530,20 @@ class TopDownHypothesisSpace(HypothesisSpace):
         expansions = list(self._hypothesis_space.successors(body))
 
         if len(expansions) == 0:
-            expansions = self._expand_body(body)
+            expansions = self._expand_bodywithprimitive(body,primitive)
         else:
             return []
 
         return reduce(
             lambda x, y: x + y,
-            [self.retrieve_clauses_from_body(x) if "partner" not in self._hypothesis_space.nodes[x] else self._get_recursions(x) for x in expansions],
-            [],
-        )
+            [self.retrieve_clauses_from_body(x) if "partner" not in self._hypothesis_space.nodes[
+                x] else self._get_recursions(x) for x in expansions],
+            [],)
+        #expansie = []
+        #for exps in expansions:
+        #    expansie.append(Clause(node.get_head(),Body(*exps.get_literals())))
+
+        #return expansie
 
     def block(self, node: typing.Union[Clause, Procedure]) -> None:
         """

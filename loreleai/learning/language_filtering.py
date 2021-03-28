@@ -2,6 +2,7 @@ from functools import reduce
 
 from loreleai.language.lp import Body, Atom, Not, Predicate
 from .utilities import are_variables_connected
+from collections import Counter
 
 """
 It contains the functions used to prune the search space
@@ -86,12 +87,29 @@ def max_pred_occurrences(head: Atom, body: Body, pred: Predicate, max_occurrence
 
     return len(preds) <= max_occurrence
 
+def max_var_occurrences(head: Atom, body: Body, max_occurrence: int) -> bool:
+    """
+    Returns True if the predicate pred does not appear more than max_occurrence times in the clause
+    """
+    if len(body.get_variables())>0:
+        counter = Counter(body.get_variables())
+        if(body.get_literals()[-1].get_predicate().get_name()=='copy1'):
+            print(counter)
+
+        return counter.most_common()[0][1]>=max_occurrence
+    else:
+        return False
+
 
 def has_duplicated_literal(head: Atom, body: Body) -> bool:
     """
     Returns True if there are duplicated literals in the body
     """
     return len(body) != len(set(body.get_literals()))
+
+def has_duplicated_variable(head: Atom, body: Body) -> bool:
+
+    return len(body.get_literals()[-1].get_variables()) != len(set(body.get_literals()[-1].get_variables()))
 
 
 
