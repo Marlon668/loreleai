@@ -10,13 +10,6 @@ class mytuple:
         self._expansion = expansion
 
     def __lt__(self, nxt):
-        #if self._value == nxt._value:
-        #    if self._expansion == nxt._expansion:
-        #        return self._neural<=nxt._neural
-        #    else:
-        #        return self._expansion<=nxt._expansion
-        #else:
-        #    return self._value<=nxt._value
         return self._value<=nxt._value
 
     def __repr__(self):
